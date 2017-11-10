@@ -1,0 +1,486 @@
+Using a Graph Database with Go 
+All the Good Bits
+
+Daniel Toebe
+@dtoebe
+
+* Outline
+
+- What is a graph database
+- Little bit on graph theory and terminology
+- Why and why not use a graph database
+- Some popular graph databases
+- My graph database of choice
+- A problem to solve
+- Diving in
+- Using graph database along side your existing datastore
+- Honorable mentions
+
+* What is a graph database
+
+A graph database is a database designed specifically to find relationships between 2 or more chuncks of data.
+
+    - Think FaceBook, and how they reccomend new freinds 
+
+.image images/grapg2.png 300 _
+
+* Little bit on graph theory and terminology
+
+* What is graph theory 
+
+To put it simply a graph is just an ordered pair
+
+    G = (V, E)
+     - V: A set of Vertices
+     - E: Edge between those Vertices
+
+.image images/graph.png 300 _
+
+source: https://en.wikipedia.org/wiki/Graph_theory#/media/File:6n-graf.svg
+
+* Important terms
+
+- Vertices, or Nodes: is the object of data your trying to find a relation between
+- Edge, or Predicate: is the connection or relation between 2 or more nodes
+
+For the purpose of this discussion we will use the terms Node, and Predicate
+
+* Why use a graph database
+
+- If you have a large dataset where you need to find indirect relations that might not easily be done with traditional datastores
+
+    Example:
+        - Say you want to find if a user has a friend of a friend
+        - In a standard relational database you would have to have:
+            - user table
+            - a link table called friends_with that takes the user id and all their friend's ids
+        - You would then have to query the user, then query the friends_with and then filter 
+          by the friend of the fiend's id
+        - And if you wanted to find data on another table then you would need another 
+          link table.. So on and so on...
+
+    With a graph database, instead of link tables you create predicates between the user nodes.
+    Then you can just search down those predicates.
+
+.image images/grapg2.png 180 _
+
+* What's not so great about graph databases
+
+- Traditionally graph databases are considered to be slow
+- Because of this slowness, graph databases area not widely adapted
+- Because they are not widely adapted finding developers with existing expirience is expensive and difficult
+- The data model is vastly different than traditional relational databases, so training existing developers can also be expensive
+- They also will require more overhead, and traditionally require large amounts of memory and powerful CPUs
+- This is a big one for me, but there is no standard on query languages. This might create a sort of vendor lockin to a single graph database technology
+
+
+* Top 3 graph databases in the market
+
+* Neo4j
+
+.image images/neo4j.png
+
+Website:
+
+.link https://neo4j.com/
+
+* OrientDB
+
+.image images/orientdb.jpg
+
+Website:
+
+.link http://orientdb.com/orientdb/
+
+* Titan DB
+
+.image images/titan-logo2.png
+
+Website:
+
+.link http://titan.thinkaurelius.com/
+
+* Why I don't like them
+
+All three are based on the JVM
+
+    - While using Java can make for fast development (if this was 2008). 
+    
+    - The JVM comes with a lot of overhead and a relatively high cost of maintainability on its own.
+    
+    - Because of that overhead they are all resource intensive
+    
+    - When dealing with deep search (something like 3 nodes or more) they, 
+      become very slow on large datasets (isn't that what they are for?!?)
+    
+    - This makes it very hard to scale, and why many tech companies go back to relational database
+
+    - The companies that are successful with graph databases create their own (FaceBook, Twitter) 
+
+* Some of my favorites
+
+* Cayley
+
+.image images/cayley_side.png _ 700
+
+Website:
+
+.link https://cayley.io/
+
+* Cayley
+
+What's great:
+
+    - Modeled after Firebase
+    - Written in Go
+    - Really fast
+    - Can run different database backends such as Postgres, and MongoDB
+    - Or in memory with BoltDB
+
+What's not so great:
+
+    - Young and unstable
+    - Not feature complete
+    - No UI for visual data modeling
+
+* ArangoDB
+
+.image images/Arangodb-01.png
+
+Website:
+
+.link https://www.arangodb.com/
+
+* ArangoDB
+
+What's great:
+
+    - Faster than the top 3
+    - Written in C++
+    - UI for visual data modeling
+
+What's not so great:
+
+    - Wide scope of focus. It is a NoSQL document store, a k/v datastore, and a graph database
+        While really all graphDB's are these, Arango just doesn't optimize for graphs it 
+        optimizes for all 3
+
+* My graph database of choice
+
+* Dgraph
+
+.image images/Dgraph-Home.png 400 _
+
+* Why Dgraph
+
+- Written in Go
+- Boasts to be 10x faster than the top 3
+- Great query language (GraphQL+-)
+- UI for visual data modeling
+- Go is a first-class citizen
+- Communication via: CLI: cURL; Go: gRPC and protobuf, HTTP
+- Clusterable
+- And just plain fun...
+
+* So... We need a problem to solve
+
+* The problem: 
+
+    Let's pretend that the Phoenix Gophers has customers with technical problems to solve.
+    While 1 or 2 requests a day is easy to dispatch, but what if we get 100 or more
+
+-- What then?
+
+* Phoenix Gophers Customer Service Ticketing System
+
+This ticketing system will allow customers to create tickets, with tags, and our graphDB will find the 2 most qualified members.
+
+* Diving in...
+
+* Deploying Dgraph
+
+Binary: Get the download script
+
+    $ curl https://get.dgraph.io > dgraph.sh
+
+    $ chmod +x dgraph.sh
+
+    $ ./dgraph.sh
+
+    $ dgraph --memory_mb 2048 --peer 127.0.0.1:8888
+
+Docker: Pull, Create, and Run locally
+
+    # docker pull dgraph/dgraph
+    # docker run -it -p 8080:8080 -p 9080:9080 dgraph/dgraph:v0.8.2 dgraph --bindall=true 
+        --memory_mb 2048
+
+Note: Add the -v flag for persistent data
+
+* Connecting to Dgraph
+
+cURL:
+
+    $ curl localhost:8080/query -XPOST -d '{ query(){} }'
+
+* Connecting to Dgraph (continued...)
+
+Go with gRPC:
+
+    ...
+    
+    import (
+        "github.com/dgraph-io/dgraph/client"
+        "github.com/gogo/protobuf/proto"
+        "google.golang.org/grpc"
+    )
+
+    func main() {
+        // gRPC connection
+        conn, _ := grpc.Dial("127.0.0.1:9080", grpc.WithInsecure())
+        defer conn.close()
+        // The Dgraph client needs a directory in which to write its blank node maps
+        clientDir, _ := ioutil.TempDir("", "client_")
+        defer os.RemoveAll(clientDir)
+        // Connect to the Dgraph instance. The grpc.ClientConn is a slice to allow for clustering
+        dgraphClient := client.NewDgraphClient([]*grpc.ClientConn{conn}, client.DefaultOptions,
+            clientDir)
+        defer dgraphClient.Close()
+    }
+
+* Initial data
+
+* Structure of the data
+
+- Mutation object is the top most parent object telling the server that the everything inside will create or update records.
+- Schema object will define attributes and predicates (edges) of the data.
+- Set is where we define or update the data and the relations between them.
+
+    mutation {
+        schema {}
+        set {}
+    }
+
+* Structure of the data (continued...)
+
+Schema object:
+
+name: string @index(exact, term)
+
+- name: is the descriptor of the data
+- string: defines the type of the data, here are some of the other types, and how they map in Go
+
+    - int: Go(int64)
+    - float: Go(float)
+    - id: Go(string)
+    - dateTime: Go(time.Time (RFC3339 format))
+    - geo:  GoLib(go-geom)
+
+- @index is a function that says this is an indexable attribute so it can be searched by:
+
+    - exact: can be search by exact match
+    - term: can be search with full text search
+
+
+* Structure of the data (continued...)
+
+Let's look at one more example:
+
+skill: uid @reverse @count
+
+- skill: is the descriptor of the data
+- uid: this shows that this is a predicate (edge) that points to another node
+- @reverse: predicates are unidirectional and the reverse attribute allows this predicate type to be reversed 
+- @count: this allows this predicate to be counted. Think like how many skills does a user have
+
+* Inside the Set Object:
+
+The set object is where we define the actual data
+
+_:go <name> "go" .
+
+    - _:go : is a shortcut to the UID defined by _:go or will create one if not exists
+    - <name> : is the schema type. as seen before this will be a string
+    - "go" : is the string <name> for the _:go node
+
+_:john <skill> _:go .
+
+    - This creates a predicate between the _:john node and the _:go node
+
+* Querying data via the Dgraph Browser
+
+* Dgraph Browser [screenshot]
+
+.image images/DgraphBrowser.png _ 900
+
+* Querying the data via Go
+
+* client.Rec{}.SetQuery()
+
+First we have to define a struct to put our data in 
+Then inside the func or method we need to:
+
+    ...
+    // With my tests I have to wrap the preferred struct in a temp struct
+    var root struct {
+        Tickets []Ticket `dgraph:"tag"
+    }
+    // Now we set the request
+    dgraphClient.Req{}
+    // Set the query
+    req.SetQuery(`{
+        tickets(func: eq(type, "ticket")) {
+            name
+            tags : tag {
+                name
+            }
+        }
+    }`)
+    // Run the query
+    res, _ := dgraphClient.Run(context.Background(), &req)
+    // unmarshal data to the struct
+    client.Unmarshal(res.N, &root)
+    ...
+
+* client.Rec{}.SetQueryWithVariables()
+
+Mostly the same as the SetQuery() method but you can add a second param with a map[string]string
+
+    var v := make(map[string]string)
+    // The key is the variable name definition and the value is the value of the variable
+    v["$1"] = "ticket"
+    req.SetQueryWithVariables(`{
+        tickets(func: eq(type, $1)) {
+            name
+            tags : tag {
+                name
+            }
+        }
+    }`)     
+
+* Now lets get back to our problem...
+
+We need to find the top 2 users for a ticket based on tags.
+
+* Getting the top users for a ticket based on skills
+
+    {
+        // Find the ticket with the term "first" in its title
+        var(func: allofterms(title, "first")) {
+            // Start a counter for each user
+            a as math(1)
+            tag {
+                ~skill {
+                    // The user score stores the count of tags they have a skill of
+                    userScore as math(a)
+                }
+            }
+        }
+
+        // Now we define the result to return
+        users(func: uid(userScore), orderdesc: val(userScore), first: 2) {
+            _uid_
+            name
+            score : val(userScore)
+        }
+    }
+
+* Getting the top users for a ticket based on skills (results)
+
+    {
+        "data": {
+            "users": [
+                {
+                    "_uid_": "0x13",
+                    "name": "john",
+                    "score": 3
+                },
+                {
+                    "_uid_": "0x18",
+                    "name": "thomas",
+                    "score": 2
+                }
+            ]
+        }
+    }
+
+* Creating new data
+
+Creating and updating new data is similar to when we added the initial data
+
+    mutation {
+        set {
+            _:daniel <name> "daniel" .
+            _:daniel <type> "user" .
+        }
+    }
+
+* Updating existing data
+
+    {
+        skills as var (func: anyofterms(name, "go linux javascript"))
+        user as var(func: eq(name, "daniel"))
+    }
+
+    mutation {
+        set {
+            uid(user) <skill> uid(skills) .
+        }
+    }
+
+- Here I define what skills I want to add to my user.
+    - I use the anyofterms() func with a string that will search each word andf find the nodes with 
+      any of those terms. 
+    - It will select the "go", "linux", and "javascript" nodes.
+- I also find the user I want to update
+
+* Some other use cases...
+
+* A real-time Recommendation Engine
+
+.image images/graph3.png 300 _
+
+- User 1 and User 2 have purchased Prouduct 1. So now if we traverse the graph, we see that User 2 has purchased Product 2.
+- So based on User 2's purchases we can reccomend Product 2 to User 1
+- We can also reccomend Product 3 to User 2 since User 2 has purchased Product 2, and Product 2, and Product 3 are in the same category
+
+* Roles and access managment
+
+.image images/graph4.png 300 _
+
+- Say User 1 and User 2 are in a chat room together
+- User 1 is admin of that chat room, and User 2 is just a user of that room
+- Now User 2 wants to change the name of the chat room (which should only be allowed by an admin user)
+- We traverse the graph and find that User 2 cannot change the name of the chat room
+
+* How about using a graph database along side your existing database
+
+* Finishing up...
+
+* Honorable mentions
+
+* Dgraph
+
+.image images/Dgraph-Home.png 300 _
+
+- Website: https://dgraph.io/
+- Forum: https://discuss.dgraph.io/
+- Github: https://github.com/dgraph-io/dgraph
+- Special Thanks To: Pawan Rawal @pawan_rawal ‏ 
+
+* Phoenix Gophers Meetup
+
+.image images/phxgophers.jpeg 300 _
+
+- Website: https://www.meetup.com/Golang-Phoenix/
+- Twitter: @golangPhoenix
+- Organizer: Brian Downs
+
+* Our Host: Bolste
+
+.image images/logo_med.png
+
+The all-in-one Digital Work Hub with business messaging, video conferencing, unlimited file storage & task management at one low price.
+
+- Website: https://bolste.com/
+- Twitter: @bolsteapp

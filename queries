@@ -1,0 +1,122 @@
+// SLIDE: 35.1 -- First query to show the browser
+
+// Show off basic use and eq() 
+
+{
+  users(func: eq(type, "user")) {
+    name
+    skills : skill {
+      name
+    }
+  }
+}
+
+// SLIDE: 35.2 --  Second query to show off the browser
+
+// Show off anyofterms()
+
+{
+  tickets(func: anyofterms(type, "ticket")) {
+    name
+    desc
+    tags : tag {
+      name
+    }
+  }
+}
+
+// SLIDE: 35.3 -- Third query to show off the browser
+
+// Sow off reverse traversal
+
+{
+  skills(func: eq(type, "skill")) {
+    name
+    has_skill : ~skill {
+      name
+    }
+    
+    has_tag : ~tag {
+      name
+    }
+  }
+}
+
+// 39.1 -- Find the ticket you want
+
+{
+  ticket(func: allofterms(name, "first")) {
+    name
+    desc
+    tags : tag {
+      name
+    }
+  }
+}
+
+// 39.2 -- find all the users that match the criteria
+
+{
+  ticket(func: allofterms(name, "first")) {
+    name
+    desc
+    tags : tag {
+      name
+      skills : ~skill {
+      	name
+    	}
+    }
+  }
+}
+
+// 39.3 -- find just the users 
+
+{
+    var(func: allofterms(name, "first")) {
+        a as math(1)
+        tag {
+            ~skill {
+                userScore as math(a)
+            }
+        }
+    }
+
+    users(func: uid(userScore), orderdesc: val(userScore), first: 2) {
+        _uid_
+        name
+        score : val(userScore)
+    }
+}
+
+// 42.1 New Data
+
+// Show crerating new Data, and adding items that are not in the schema
+
+mutation {
+    set {
+        _:daniel <name> "daniel" .
+        _:daniel <type> "user" .
+    }
+}
+
+// 42.2 -- Show the users that was created 
+{
+    users(func: eq(type, "user")) {
+        name
+        skills : skill {
+            name
+        }
+    }
+}
+
+// 42.3 -- Add More data 
+{
+  skills as var (func: anyofterms(name, "go linux javascript"))
+  user as var(func: eq(name, "daniel"))
+}
+
+mutation {
+  set {
+    uid(user) <skill> uid(skills) .
+  }
+}
